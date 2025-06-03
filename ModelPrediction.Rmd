@@ -1,0 +1,52 @@
+---
+title: "Analyse prédictive avec caret"
+output: html_document
+---
+
+```{r, include=TRUE, echo=TRUE, results='show', message=TRUE, warning=TRUE}
+# I - Chargement des packages
+if (!require(caret)) install.packages("caret", dependencies = TRUE)
+if (!require(randomForest)) install.packages("randomForest")
+if (!require(rpart)) install.packages("rpart")
+library(caret)
+library(randomForest)
+library(rpart)
+
+# II - Chargement des données
+set.seed(20000)
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"   
+testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv" 
+training <- read.csv(url(trainUrl), na.strings=c("NA","#DIV/0!",""))  
+testing <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+
+# III - Nettoyage des données
+training <- training[, colSums(is.na(training)) == 0]
+testing  <- testing[, colSums(is.na(testing)) == 0]
+training <- training[, -c(1:7)]
+testing  <- testing[, -c(1:7)]
+training$classe <- as.factor(training$classe)
+
+# IV - Création d’un jeu d'entraînement/test
+inTrain <- createDataPartition(y = training$classe, p = 0.75, list = FALSE)
+NEOTraining <- training[inTrain, ]
+NEOTesting  <- training[-inTrain, ]
+
+# V - Modèle Arbre de Décision
+fitDT <- rpart(classe ~ ., data = NEOTraining, method = "class", control = rpart.control(cp = 0.001))
+predictionDT <- predict(fitDT, NEOTesting, type = "class")
+predictionDT <- factor(predictionDT, levels = levels(NEOTraining$classe))
+NEOTesting$classe <- factor(NEOTesting$classe, levels = levels(NEOTraining$classe))
+cat("=== Matrice de confusion - Arbre de décision ===\n")
+print(confusionMatrix(reference = NEOTesting$classe, data = predictionDT))
+
+# VI - Modèle Random Forest
+fitRF <- randomForest(classe ~ ., data = NEOTraining, method = "class")
+predictionRF <- predict(fitRF, NEOTesting, type = "class")
+cat("\n=== Matrice de confusion - Random Forest ===\n")
+print(confusionMatrix(NEOTesting$classe, predictionRF))
+
+# VII - Prédiction finale sur les 20 cas de test
+predictSubmission <- predict(fitRF, testing, type = "class")
+cat("\n=== Prédictions sur les données de test ===\n")
+print(predictSubmission)
+```
